@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>过三关</title>
+    <title>彩虹過三關</title>
     <style>
         body {
             font-family: 'Arial Rounded MT Bold', 'Arial', sans-serif;
@@ -200,6 +200,32 @@
             transform: translateY(-2px);
         }
         
+        .game-mode {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .mode-btn {
+            background: linear-gradient(to right, #6a11cb, #2575fc);
+            border: none;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 50px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .mode-btn.active {
+            background: linear-gradient(to right, #f6d365, #fda085);
+        }
+        
+        .mode-btn:hover {
+            transform: translateY(-2px);
+        }
+        
         .dark-theme {
             background: linear-gradient(135deg, #232526 0%, #414345 100%);
             color: white;
@@ -229,8 +255,13 @@
     </style>
 </head>
 <body>
-    <button class="theme-toggle" onclick="toggleTheme()">切换主题</button>
-    <h1>过三关</h1>
+    <button class="theme-toggle" onclick="toggleTheme()">切換主題</button>
+    <h1>彩虹過三關</h1>
+    
+    <div class="game-mode">
+        <button class="mode-btn active" onclick="setGameMode('pvp')">雙人對戰</button>
+        <button class="mode-btn" onclick="setGameMode('ai')">對戰電腦</button>
+    </div>
     
     <div class="scoreboard">
         <div class="player player-x active" id="player-x">
@@ -257,8 +288,8 @@
         </div>
         
         <div class="message" id="message">
-            <h2 id="message-text">X 获胜!</h2>
-            <button class="restart-btn" onclick="restartGame()">再来一局</button>
+            <h2 id="message-text">X 獲勝!</h2>
+            <button class="restart-btn" onclick="restartGame()">再來一局</button>
         </div>
     </div>
     
@@ -271,19 +302,29 @@
         const playerO = document.getElementById('player-o');
         const scoreX = document.getElementById('score-x');
         const scoreO = document.getElementById('score-o');
+        const modeButtons = document.querySelectorAll('.mode-btn');
         
         let currentPlayer = 'x';
         let gameActive = true;
         let gameState = ['', '', '', '', '', '', '', '', ''];
         let scores = { x: 0, o: 0 };
+        let gameMode = 'pvp'; // 預設為雙人模式
         
         const winningConditions = [
-            [0, 1, 2], [3, 4, 5], [6, 7, 8], // 横
-            [0, 3, 6], [1, 4, 7], [2, 5, 8], // 竖
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // 橫
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // 豎
             [0, 4, 8], [2, 4, 6]             // 斜
         ];
         
-        // 
+        // 設置遊戲模式
+        function setGameMode(mode) {
+            gameMode = mode;
+            modeButtons.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            restartGame();
+        }
+        
+        // 初始化遊戲
         function initGame() {
             cells.forEach(cell => {
                 cell.classList.remove('x', 'o', 'winning-cell');
@@ -295,12 +336,17 @@
             gameActive = true;
             message.style.display = 'none';
             
-            // 
+            // 隨機決定先手玩家
             currentPlayer = Math.random() > 0.5 ? 'x' : 'o';
             updatePlayerTurn();
+            
+            // 如果是AI模式且AI先手，則AI先走
+            if (gameMode === 'ai' && currentPlayer === 'o') {
+                setTimeout(makeAIMove, 500);
+            }
         }
         
-        // 
+        // 處理格子點擊
         function handleCellClick(e) {
             const clickedCell = e.target;
             const clickedCellIndex = parseInt(clickedCell.getAttribute('data-index'));
@@ -309,20 +355,82 @@
                 return;
             }
             
-            // 
+            // 更新遊戲狀態
             gameState[clickedCellIndex] = currentPlayer;
             clickedCell.textContent = currentPlayer.toUpperCase();
             clickedCell.classList.add(currentPlayer);
             
-            // 
+            // 檢查遊戲結果
             checkResult();
+            
+            // 如果是AI模式且遊戲繼續，則AI走棋
+            if (gameActive && gameMode === 'ai' && currentPlayer === 'o') {
+                setTimeout(makeAIMove, 500);
+            }
         }
         
-        // 
+        // AI走棋
+        function makeAIMove() {
+            if (!gameActive) return;
+            
+            // 簡單的AI邏輯：
+            // 1. 首先檢查AI是否能直接獲勝
+            // 2. 然後檢查是否需要阻止玩家獲勝
+            // 3. 否則隨機選擇一個可用的格子
+            
+            let move = findWinningMove('o'); // 檢查AI是否能贏
+            if (move === -1) {
+                move = findWinningMove('x'); // 檢查是否需要阻止玩家
+            }
+            if (move === -1) {
+                move = findRandomMove(); // 隨機選擇
+            }
+            
+            // 執行AI的移動
+            if (move !== -1) {
+                gameState[move] = currentPlayer;
+                cells[move].textContent = currentPlayer.toUpperCase();
+                cells[move].classList.add(currentPlayer);
+                checkResult();
+            }
+        }
+        
+        // 尋找獲勝的移動
+        function findWinningMove(player) {
+            for (let i = 0; i < winningConditions.length; i++) {
+                const [a, b, c] = winningConditions[i];
+                // 檢查是否有兩個相同標記和一個空格
+                if ((gameState[a] === player && gameState[b] === player && gameState[c] === '') ||
+                    (gameState[a] === player && gameState[c] === player && gameState[b] === '') ||
+                    (gameState[b] === player && gameState[c] === player && gameState[a] === '')) {
+                    // 返回空格的索引
+                    if (gameState[a] === '') return a;
+                    if (gameState[b] === '') return b;
+                    if (gameState[c] === '') return c;
+                }
+            }
+            return -1; // 沒有找到獲勝移動
+        }
+        
+        // 尋找隨機移動
+        function findRandomMove() {
+            const availableMoves = [];
+            for (let i = 0; i < gameState.length; i++) {
+                if (gameState[i] === '') {
+                    availableMoves.push(i);
+                }
+            }
+            if (availableMoves.length > 0) {
+                return availableMoves[Math.floor(Math.random() * availableMoves.length)];
+            }
+            return -1; // 沒有可用的移動
+        }
+        
+        // 檢查遊戲結果
         function checkResult() {
             let roundWon = false;
             
-            // 
+            // 檢查是否獲勝
             for (let i = 0; i < winningConditions.length; i++) {
                 const [a, b, c] = winningConditions[i];
                 
@@ -333,28 +441,28 @@
                 if (gameState[a] === gameState[b] && gameState[b] === gameState[c]) {
                     roundWon = true;
                     
-                    // 
+                    // 高亮顯示獲勝的格子
                     cells[a].classList.add('winning-cell');
                     cells[b].classList.add('winning-cell');
                     cells[c].classList.add('winning-cell');
                     
-                    // 
+                    // 創建彩色粒子效果
                     createConfetti();
                     break;
                 }
             }
             
-            // 
+            // 處理獲勝情況
             if (roundWon) {
                 scores[currentPlayer]++;
                 updateScores();
-                messageText.textContent = `${currentPlayer.toUpperCase()} 获胜!`;
+                messageText.textContent = `${currentPlayer.toUpperCase()} 獲勝!`;
                 message.style.display = 'block';
                 gameActive = false;
                 return;
             }
             
-            // 
+            // 檢查是否平局
             if (!gameState.includes('')) {
                 messageText.textContent = '平局!';
                 message.style.display = 'block';
@@ -362,12 +470,12 @@
                 return;
             }
             
-            // 
+            // 切換玩家
             currentPlayer = currentPlayer === 'x' ? 'o' : 'x';
             updatePlayerTurn();
         }
         
-        // 
+        // 更新玩家回合顯示
         function updatePlayerTurn() {
             if (currentPlayer === 'x') {
                 playerX.classList.add('active');
@@ -378,18 +486,18 @@
             }
         }
         
-        // 
+        // 更新分數顯示
         function updateScores() {
             scoreX.textContent = scores.x;
             scoreO.textContent = scores.o;
         }
         
-        // 
+        // 重新開始遊戲
         function restartGame() {
             initGame();
         }
         
-        // 
+        // 創建彩色粒子效果
         function createConfetti() {
             const colors = ['#ff4d4d', '#4d79ff', '#6a11cb', '#f6d365', '#fda085', '#a1c4fd'];
             
@@ -397,7 +505,7 @@
                 const confetti = document.createElement('div');
                 confetti.classList.add('confetti');
                 
-                // 
+                // 隨機屬性
                 const size = Math.random() * 10 + 5;
                 const color = colors[Math.floor(Math.random() * colors.length)];
                 const left = Math.random() * 100;
@@ -411,19 +519,19 @@
                 
                 document.body.appendChild(confetti);
                 
-                // 
+                // 動畫結束後移除
                 setTimeout(() => {
                     confetti.remove();
                 }, animationDuration * 1000);
             }
         }
         
-        // 
+        // 切換主題
         function toggleTheme() {
             document.body.classList.toggle('dark-theme');
         }
         
-        // 
+        // 初始化遊戲
         initGame();
     </script>
 </body>
